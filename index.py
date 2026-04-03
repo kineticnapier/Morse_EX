@@ -7,75 +7,7 @@ from discord.app_commands import CommandTree
 from dotenv import load_dotenv
 
 from conv_func import morse_to_text, text_to_morse
-
-
-INSTALLS_KW = {"guilds": True, "users": True}
-CONTEXTS_KW = {"guilds": True, "dms": True, "private_channels": True}
-
-
-def allow_everywhere(func):
-    func = discord.app_commands.allowed_installs(**INSTALLS_KW)(func)
-    func = discord.app_commands.allowed_contexts(**CONTEXTS_KW)(func)
-    return func
-
-
-def suffix_unconverted(flag: bool) -> str:
-    return "\n(変換できない文字がありました)" if flag else ""
-
-
-async def send_ephemeral(interaction: Interaction, message: str) -> None:
-    await interaction.response.send_message(message, ephemeral=True)
-
-
-def get_messageable_channel(
-    interaction: Interaction,
-) -> discord.abc.Messageable | None:
-    channel = interaction.channel
-
-    if channel is None:
-        return None
-
-    if isinstance(channel, discord.ForumChannel):
-        return None
-
-    return cast(discord.abc.Messageable, channel)
-
-
-async def fetch_message_in_current_channel(
-    interaction: Interaction,
-    message_id: str,
-) -> discord.Message | None:
-    if not message_id.isdigit():
-        await send_ephemeral(interaction, "メッセージIDは数字で指定してください。")
-        return None
-
-    channel = get_messageable_channel(interaction)
-    if channel is None:
-        await send_ephemeral(
-            interaction,
-            "このコマンドはメッセージを取得できるチャンネルでのみ使用できます。",
-        )
-        return None
-
-    try:
-        return await channel.fetch_message(int(message_id))
-    except discord.NotFound:
-        await send_ephemeral(
-            interaction,
-            "そのメッセージはこのチャンネルで見つかりませんでした。",
-        )
-    except discord.Forbidden:
-        await send_ephemeral(
-            interaction,
-            "そのメッセージを読む権限がありません。",
-        )
-    except discord.HTTPException as e:
-        await send_ephemeral(
-            interaction,
-            f"取得に失敗しました: {e}",
-        )
-
-    return None
+from helper_func import suffix_unconverted, allow_everywhere, send_ephemeral, fetch_message_in_current_channel
 
 
 class MyClient(Client):
@@ -95,7 +27,9 @@ intents = Intents.default()
 intents.message_content = True
 client = MyClient(intents=intents)
 
-
+# ----------------------
+# スラッシュコマンド
+# ----------------------
 @client.tree.command(name="encrypt", description="平文をモールス信号に変換します")
 @allow_everywhere
 @app_commands.describe(
@@ -162,6 +96,7 @@ async def decrypt_text(
 ) -> None:
     plain, flag = morse_to_text(text, mode.value)
     await interaction.response.send_message(plain + suffix_unconverted(flag))
+
 
 # ----------------------
 # コンテキストメニュー
